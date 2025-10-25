@@ -1,45 +1,17 @@
 const feeds = {
-  science: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-  technology: "https://feeds.bbci.co.uk/news/technology/rss.xml",
-  politics: "https://feeds.bbci.co.uk/news/politics/rss.xml"
+  science: "data/science.json",
+  tech: "data/tech.json",
+  politics: "data/politics.json"
 };
 
 let currentCategory = "science";
 let articles = [];
 
-document.getElementById("controls").addEventListener("click", e => {
-  if (e.target.dataset.cat) {
-    currentCategory = e.target.dataset.cat;
-    loadFeed(currentCategory);
-  }
-});
-
-document.getElementById("search").addEventListener("input", e => {
-  renderArticles(articles.filter(a =>
-    a.title.toLowerCase().includes(e.target.value.toLowerCase())
-  ));
-});
-
 async function loadFeed(cat) {
-  const url = feeds[cat];
   document.getElementById("articles").innerHTML = "<p>Loading…</p>";
-  try {
-    const resp = await fetch(url);
-    const text = await resp.text();
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, "application/xml");
-    const items = Array.from(xml.querySelectorAll("item"));
-    articles = items.map(it => ({
-      title: it.querySelector("title").textContent,
-      link: it.querySelector("link").textContent,
-      pubDate: it.querySelector("pubDate").textContent,
-      description: it.querySelector("description").textContent
-    }));
-    renderArticles(articles);
-  } catch(err) {
-    document.getElementById("articles").innerHTML = "<p>Error loading feed.</p>";
-    console.error(err);
-  }
+  const res = await fetch(feeds[cat]);
+  articles = await res.json();
+  renderArticles(articles);
 }
 
 function renderArticles(list) {
@@ -47,15 +19,32 @@ function renderArticles(list) {
   container.innerHTML = "";
   list.forEach(a => {
     const div = document.createElement("div");
+    div.className = "article";
     div.innerHTML = `
       <h3><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></h3>
-      <p>${a.description}</p>
-      <p><small>${a.pubDate}</small></p>
-      <hr>
+      <p>${a.summary || ""}</p>
+      <small>${new Date(a.pubDate).toLocaleString()} — ${a.source}</small>
     `;
-    container.append(div);
+    container.appendChild(div);
   });
 }
+
+// category buttons
+document.querySelectorAll("nav button").forEach(btn =>
+  btn.addEventListener("click", () => {
+    currentCategory = btn.dataset.cat;
+    loadFeed(currentCategory);
+  })
+);
+
+// search filter
+document.getElementById("search").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  const filtered = articles.filter(a =>
+    a.title.toLowerCase().includes(q) || (a.summary || "").toLowerCase().includes(q)
+  );
+  renderArticles(filtered);
+});
 
 // initial load
 loadFeed(currentCategory);
